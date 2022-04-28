@@ -3,7 +3,9 @@
 ```console
 mkdir build
 cd build
-cmake -D CGV_DIR=<path to cgv> ..
+cmake -D CGV_DIR=[path to cgv] ..
 cmake --build . -j8
+
+bin/cgv_viewer plugin:cg_fltk [...] plugin:my_plugin
 ```
 

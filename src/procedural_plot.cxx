@@ -15,4 +15,4 @@ public:
 };
 
 #include <cgv/base/register.h>
-cgv::base::factory_registration<procedural_plot> noise_fac("new/demo/procedural_plot", 'N');
+cgv::base::factory_registration<procedural_plot> procedural_plot("new/demo/procedural_plot", 'N');

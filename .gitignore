@@ -4,3 +4,4 @@ CMAKE
 RUN
 bib/references.bib.*
 .idea
+doc

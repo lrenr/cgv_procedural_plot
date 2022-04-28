@@ -1,6 +1,9 @@
 #include <cgv_gl/gl/gl.h>
 #include <cgv/base/node.h>
 
+/**
+ * Procedural Plot Plugin
+ **/
 class procedural_plot : public cgv::base::node
 {
 public:
@@ -8,9 +11,9 @@ public:
 	{
 		std::cout << "Hallo" << std::endl;
 	}
-	std::string get_type_name() const 
-	{ 
-		return "procedural_plot"; 
+	std::string get_type_name() const
+	{
+		return "procedural_plot";
 	}
 };
 

@@ -1,4 +1,6 @@
 build
+cmake-build
 CMAKE
 RUN
 bib/references.bib.*
+.idea

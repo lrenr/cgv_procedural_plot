@@ -1,10 +1,11 @@
 # CGV-Plugin to generate plots in the fragment shader
 
 ```console
+export CGV_DIR=[path to cgv]
 mkdir build
 cd build
-cmake -D CGV_DIR=[path to cgv] ..
-cmake --build . -j8
+cmake ..
+cmake --build . -j
 
 bin/cgv_viewer plugin:cg_fltk [...] plugin:my_plugin
 ```

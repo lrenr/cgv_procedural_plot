@@ -1,0 +1,13 @@
+#version 150
+
+/*
+The following interface is implemented in this shader:
+//***** begin interface of hallo_world.glfs ***********************************
+vec3 test_color();
+//***** end interface of hallo_world.glfs ***********************************
+*/
+
+vec3 test_color()
+{
+    return vec3(255, 0, 0);
+}

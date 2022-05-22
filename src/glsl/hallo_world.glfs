@@ -1,18 +1,25 @@
-#version 150
+#version 420
 
 #define IS_RED 0
+#define IS_HIDDEN 0
 
 /*
 The following interface is implemented in this shader:
 //***** begin interface of hallo_world.glfs ***********************************
-vec3 test_color();
+vec4 test_color(vec4 color);
 //***** end interface of hallo_world.glfs ***********************************
 */
 
-vec3 test_color(vec3 rgb)
+uniform float alpha_test_val = 1.0f;
+
+vec4 test_color(vec4 color)
 {
-#if IS_RED == 1
-    return vec3(255, 0, 0);
+    color.a = alpha_test_val;
+#if IS_HIDDEN == 1
+    color.a = 0.0f;
 #endif
-    return rgb;
+#if IS_RED == 1
+    return vec4(255, 0, 0, color.a);
+#endif
+    return color;
 }

@@ -1,4 +1,6 @@
-#version 150
+#version 420
+
+#define SHOW_GRID 1
 
 /*
 The following interface is implemented in this shader:
@@ -9,19 +11,31 @@ void finish_fragment(vec4 color);
 */
 
 //***** begin interface of hallo_world.glfs ***********************************
-vec3 test_color(vec3 rgb);
+vec4 test_color(vec4 color);
 //***** end interface of hallo_world.glfs ***********************************
 
+in RECTANGLE_FS {
+	vec3 position_eye;
+	vec3 normal_eye;
+	vec2 texcoord;
+	vec4 color;
+	vec4 border_color;
+	float depth_offset;
+	flat int side; // 0 is back facing and 1 is front facing
+	vec2 splatcoord;
+	vec2 percentual_splat_size;
+	vec2 percentual_blend_width;
+	vec2 percentual_rectangle_size;
+	vec2 percentual_core_size;
+} fi;
+
 uniform float gamma = 2.2;
-uniform bool alpha_test = false;
-uniform float alpha_cutoff = 0.1;
+uniform float grid_strength;
+uniform float grid_scale;
+uniform float grid_filter;
+uniform vec2 domain_extent;
 
 out vec4 frag_color;
-
-void alphaTest(vec4 color)
-{
-    if (alpha_test && color.a <= alpha_cutoff) discard;
-}
 
 void gammaCorrection(vec4 color)
 {
@@ -30,10 +44,25 @@ void gammaCorrection(vec4 color)
 
 void finish_fragment(vec4 color)
 {
-	alphaTest(color);
+	vec2 tex_pos = fi.splatcoord*domain_extent;// texture space extent transformation [-0.5*extent,+0.5*extend]
+    color = vec4(vec3(0.5f), 1.0);
 
-	color.rgb = test_color(color.rgb);
+	color = test_color(color);
+
+	float distance_to_camera = distance(vec3(0.0), fi.position_eye);
+
+#if SHOW_GRID == 1
+	const vec2 tex_pos_grid = tex_pos+(0.5/grid_strength);
+	const float N = grid_strength*(1.0/grid_scale);
+	const vec2 w = fwidth(tex_pos_grid)+grid_filter;
+	const vec2 a = (tex_pos_grid+0.5*w)*grid_scale;
+	const vec2 b = (tex_pos_grid-0.5*w)*grid_scale;
+	const vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w)*(1.0/grid_scale);
+	const float mate = (1.0-i.x)*(1.0-i.y);
+	color = mix(vec4(1.0), color, mate);
+#endif
+
+	color.r = clamp(distance_to_camera/10, 0.0, 1.0);
 	frag_color = color;
-
 	gammaCorrection(color);
 }

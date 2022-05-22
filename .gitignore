@@ -5,3 +5,4 @@ RUN
 bib/references.bib.*
 .idea
 doc
+tex/build

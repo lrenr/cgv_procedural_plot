@@ -1,6 +1,7 @@
 #version 420
 
-#define SHOW_GRID 1
+#define SHOW_GRID 0
+#define SHOW_GRAPH 0
 
 /*
 The following interface is implemented in this shader:
@@ -30,9 +31,9 @@ in RECTANGLE_FS {
 } fi;
 
 uniform float gamma = 2.2;
-uniform float grid_strength;
-uniform float grid_scale;
-uniform float grid_filter;
+uniform float grid_strength = 60.0;
+uniform float grid_scale = 1.0;
+uniform float segment_width = 0.02;
 uniform vec2 domain_extent;
 
 out vec4 frag_color;
@@ -40,6 +41,13 @@ out vec4 frag_color;
 void gammaCorrection(vec4 color)
 {
     frag_color.rgb = clamp(pow(frag_color.rgb, vec3(gamma)),0.0,0.9999999);
+}
+
+float sdf_segment( in vec2 p, in vec2 a, in vec2 b )
+{
+	vec2 pa = p-a, ba = b-a;
+	float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+	return length( pa - ba*h );
 }
 
 void finish_fragment(vec4 color)
@@ -54,7 +62,7 @@ void finish_fragment(vec4 color)
 #if SHOW_GRID == 1
 	const vec2 tex_pos_grid = tex_pos+(0.5/grid_strength);
 	const float N = grid_strength*(1.0/grid_scale);
-	const vec2 w = fwidth(tex_pos_grid)+grid_filter;
+	const vec2 w = fwidth(tex_pos_grid);
 	const vec2 a = (tex_pos_grid+0.5*w)*grid_scale;
 	const vec2 b = (tex_pos_grid-0.5*w)*grid_scale;
 	const vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w)*(1.0/grid_scale);
@@ -62,7 +70,13 @@ void finish_fragment(vec4 color)
 	color = mix(vec4(1.0), color, mate);
 #endif
 
-	color.r = clamp(distance_to_camera/10, 0.0, 1.0);
+#if SHOW_GRAPH == 1
+	float s = sdf_segment(tex_pos, vec2(0.0), vec2(1.0));
+	float t1 = 1.0 - smoothstep(segment_width, segment_width-fwidth(s), s);
+	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, t1);
+#endif
+
+	//color.r = 1.0/distance_to_camera;
 	frag_color = color;
 	gammaCorrection(color);
 }

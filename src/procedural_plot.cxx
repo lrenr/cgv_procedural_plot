@@ -19,10 +19,11 @@ private:
     bool is_red = false;
     bool is_hidden = false;
     bool show_grid = true;
+    bool show_graph = false;
     float domain_alpha = 1.0f;
     float grid_strength = 60.0f;
     float grid_scale = 1.0f;
-    float grid_filter = 0.0f;
+    float segment_width = 0.02f;
 
     template<typename T>
     void set_uniform(cgv::render::context &ctx, const std::basic_string<char> &name, const T &value)
@@ -58,7 +59,8 @@ public:
         const cgv::render::shader_define_map defines = {
                 {"IS_RED", std::to_string(is_red)},
                 {"IS_HIDDEN", std::to_string(is_hidden)},
-                {"SHOW_GRID", std::to_string(show_grid)}
+                {"SHOW_GRID", std::to_string(show_grid)},
+                {"SHOW_GRAPH", std::to_string(show_graph)}
         };
         if(defines != current_defines)
         {
@@ -71,7 +73,7 @@ public:
         set_uniform(ctx, "domain_extent", RECT_EXTEND);
         set_uniform(ctx, "grid_strength", grid_strength);
         set_uniform(ctx, "grid_scale", grid_scale);
-        set_uniform(ctx, "grid_filter", grid_filter);
+        set_uniform(ctx, "segment_width", segment_width);
         auto &rcr = cgv::render::ref_rectangle_renderer(ctx, 0);
         rcr.set_prog(shader_program);
         rcr.set_position(ctx, RECT_POSITION);
@@ -96,12 +98,13 @@ public:
     {
         add_decorator("procedural_plot", "heading");
         add_member_control(this, "is_red", is_red, "toggle", "w=60", " ");
-        add_member_control(this, "is_hidden", is_hidden, "toggle", "w=60", " ");
-        add_member_control(this, "show_grid", show_grid, "toggle", "w=60");
+        add_member_control(this, "is_hidden", is_hidden, "toggle", "w=60");
+        add_member_control(this, "show_grid", show_grid, "toggle", "w=60", " ");
+        add_member_control(this, "show_graph", show_graph, "toggle", "w=60");
         add_member_control(this, "domain_alpha", domain_alpha, "value_slider", "min=0;max=1;step=0.001;ticks=true");
         add_member_control(this, "grid_strength", grid_strength, "value_slider", "min=10;max=200;step=1;ticks=true");
         add_member_control(this, "grid_scale", grid_scale, "value_slider", "min=0.1;max=10;step=0.1;ticks=true");
-        add_member_control(this, "grid_filter", grid_filter, "value_slider", "min=0;max=0.01;step=0.0001;ticks=true");
+        add_member_control(this, "segment_width", segment_width, "value_slider", "min=0.001;max=0.1;step=0.001;ticks=true");
     }
 };
 

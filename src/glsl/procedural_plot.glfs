@@ -43,12 +43,14 @@ void gammaCorrection(vec4 color)
     frag_color.rgb = clamp(pow(frag_color.rgb, vec3(gamma)),0.0,0.9999999);
 }
 
+#if SHOW_GRAPH == 1
 float sdf_segment( in vec2 p, in vec2 a, in vec2 b )
 {
 	vec2 pa = p-a, ba = b-a;
 	float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
 	return length( pa - ba*h );
 }
+#endif
 
 void finish_fragment(vec4 color)
 {
@@ -66,14 +68,15 @@ void finish_fragment(vec4 color)
 	const vec2 a = (tex_pos_grid+0.5*w)*grid_scale;
 	const vec2 b = (tex_pos_grid-0.5*w)*grid_scale;
 	const vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w)*(1.0/grid_scale);
-	const float mate = (1.0-i.x)*(1.0-i.y);
-	color = mix(vec4(1.0), color, mate);
+	//const vec2 i = step(fract(tex_pos_grid), vec2(1.0/N));
+	const float grid = (1.0-i.x)*(1.0-i.y);
+	color = mix(vec4(1.0), color, grid);
 #endif
 
 #if SHOW_GRAPH == 1
-	float s = sdf_segment(tex_pos, vec2(0.0), vec2(1.0));
-	float t1 = 1.0 - smoothstep(segment_width, segment_width-fwidth(s), s);
-	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, t1);
+	float sdf = sdf_segment(tex_pos, vec2(0.0), vec2(1.0));
+	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
+	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, segment);
 #endif
 
 	//color.r = 1.0/distance_to_camera;

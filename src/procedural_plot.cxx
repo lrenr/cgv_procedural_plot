@@ -49,7 +49,8 @@ public:
         glGetIntegerv(GL_BLEND_SRC, reinterpret_cast<GLint*>(&blend_src));
         glGetIntegerv(GL_DEPTH_FUNC, reinterpret_cast<GLint*>(&depth));
 
-        glEnable(GL_LINE_SMOOTH);
+        //glEnable(GL_LINE_SMOOTH);
+        glDisable(GL_LINE_SMOOTH);
         glDisable(GL_CULL_FACE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

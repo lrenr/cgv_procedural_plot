@@ -1,4 +1,4 @@
-#version 420
+#version 450
 
 #define SHOW_GRID 0
 #define SHOW_GRAPH 0
@@ -44,18 +44,51 @@ void gammaCorrection(vec4 color)
 }
 
 #if SHOW_GRAPH == 1
-float sdf_segment( in vec2 p, in vec2 a, in vec2 b )
+vec2[100] sample_sin()
+{
+	vec2 s[100];
+	for(int i = 0; i<100; i++)
+	{
+		const float x = 0.02*i;
+		const float y = sin(x*180.0*0.035);
+		s[i] = vec2(x, y);
+	}
+	return s;
+}
+vec2[100] sample_cos()
+{
+	vec2 s[100];
+	for(int i = 0; i<100; i++)
+	{
+		const float x = 0.02*i;
+		const float y = cos(x*180.0*0.035);
+		s[i] = vec2(x, y);
+	}
+	return s;
+}
+float sdf_segment(in vec2 p, in vec2 a, in vec2 b)
 {
 	vec2 pa = p-a, ba = b-a;
 	float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
 	return length( pa - ba*h );
+}
+float draw_graph(in vec2 p, vec2[100] s)
+{
+	float sdf = 1.0;
+	for(int i = 0; i<99; i++)
+	{
+		sdf = min(sdf, sdf_segment(p, s[i], s[i+1]));
+	}
+	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
+	return segment;
 }
 #endif
 
 void finish_fragment(vec4 color)
 {
 	vec2 tex_pos = fi.splatcoord*domain_extent;// texture space extent transformation [-0.5*extent,+0.5*extend]
-    color = vec4(vec3(0.5f), 1.0);
+    color = vec4(vec3(0.3f), 1.0);
+	//const vec2 w = fwidthFine(tex_pos);
 
 	color = test_color(color);
 
@@ -74,9 +107,14 @@ void finish_fragment(vec4 color)
 #endif
 
 #if SHOW_GRAPH == 1
-	float sdf = sdf_segment(tex_pos, vec2(0.0), vec2(1.0));
+	/*float sdf = sdf_segment(tex_pos, vec2(0.0), vec2(1.0));
 	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
+	//float segment = 1.0 - smoothstep(segment_width, segment_width-w.x, sdf);
+	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, segment);*/
+	float segment = draw_graph(tex_pos, sample_sin());
 	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, segment);
+	segment = draw_graph(tex_pos, sample_cos());
+	color = mix(vec4(1.0, 0.0, 1.0, 1.0), color, segment);
 #endif
 
 	//color.r = 1.0/distance_to_camera;

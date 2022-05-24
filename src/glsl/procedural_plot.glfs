@@ -32,7 +32,7 @@ in RECTANGLE_FS {
 
 uniform float gamma = 2.2;
 uniform float grid_strength = 60.0;
-uniform float grid_scale = 1.0;
+uniform float graph_scale = 1.0;
 uniform float segment_width = 0.02;
 uniform vec2 domain_extent;
 
@@ -49,8 +49,8 @@ vec2[100] sample_sin()
 	vec2 s[100];
 	for(int i = 0; i<100; i++)
 	{
-		const float x = 0.02*i;
-		const float y = sin(x*180.0*0.035);
+		float x = 0.02*i;
+		float y = sin(x*180.0*0.035);
 		s[i] = vec2(x, y);
 	}
 	return s;
@@ -60,24 +60,27 @@ vec2[100] sample_cos()
 	vec2 s[100];
 	for(int i = 0; i<100; i++)
 	{
-		const float x = 0.02*i;
-		const float y = cos(x*180.0*0.035);
+		float x = 0.02*i;
+		float y = cos(x*180.0*0.035);
 		s[i] = vec2(x, y);
 	}
 	return s;
 }
 float sdf_segment(in vec2 p, in vec2 a, in vec2 b)
 {
-	vec2 pa = p-a, ba = b-a;
-	float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-	return length( pa - ba*h );
+	vec2 pa = p-a;
+	vec2 ba = b-a;
+	float h = clamp(dot(pa,ba)/dot(ba,ba), 0.0, 1.0);
+	return length(pa-ba*h);
 }
-float draw_graph(in vec2 p, vec2[100] s)
+float draw_graph(in vec2 p, vec2[100] data, vec2 scale)
 {
 	float sdf = 1.0;
+	float delta = segment_width;
 	for(int i = 0; i<99; i++)
 	{
-		sdf = min(sdf, sdf_segment(p, s[i], s[i+1]));
+		if(p.x<(data[i]*scale).x-delta||p.x>(data[i+1]*scale).x+delta) continue;
+		sdf = min(sdf, sdf_segment(p, data[i]*scale, data[i+1]*scale));
 	}
 	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
 	return segment;
@@ -86,7 +89,7 @@ float draw_graph(in vec2 p, vec2[100] s)
 
 void finish_fragment(vec4 color)
 {
-	vec2 tex_pos = fi.splatcoord*domain_extent;// texture space extent transformation [-0.5*extent,+0.5*extend]
+	vec2 tex_pos = fi.splatcoord*domain_extent*graph_scale;// texture space extent transformation [-0.5*extent,+0.5*extend]
     color = vec4(vec3(0.3f), 1.0);
 	//const vec2 w = fwidthFine(tex_pos);
 
@@ -95,14 +98,13 @@ void finish_fragment(vec4 color)
 	float distance_to_camera = distance(vec3(0.0), fi.position_eye);
 
 #if SHOW_GRID == 1
-	const vec2 tex_pos_grid = tex_pos+(0.5/grid_strength);
-	const float N = grid_strength*(1.0/grid_scale);
-	const vec2 w = fwidth(tex_pos_grid);
-	const vec2 a = (tex_pos_grid+0.5*w)*grid_scale;
-	const vec2 b = (tex_pos_grid-0.5*w)*grid_scale;
-	const vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w)*(1.0/grid_scale);
-	//const vec2 i = step(fract(tex_pos_grid), vec2(1.0/N));
-	const float grid = (1.0-i.x)*(1.0-i.y);
+	vec2 tex_pos_grid = tex_pos+(0.5/grid_strength)*(graph_scale);
+	float N = grid_strength*(1.0/graph_scale);
+	vec2 w = fwidth(tex_pos_grid);
+	vec2 a = (tex_pos_grid+0.5*w);//*graph_scale;
+	vec2 b = (tex_pos_grid-0.5*w);//*graph_scale;
+	vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w);//*(1.0/graph_scale);
+	float grid = (1.0-i.x)*(1.0-i.y);
 	color = mix(vec4(1.0), color, grid);
 #endif
 
@@ -111,9 +113,9 @@ void finish_fragment(vec4 color)
 	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
 	//float segment = 1.0 - smoothstep(segment_width, segment_width-w.x, sdf);
 	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, segment);*/
-	float segment = draw_graph(tex_pos, sample_sin());
+	float segment = draw_graph(tex_pos, sample_sin(), vec2(2.0));
 	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, segment);
-	segment = draw_graph(tex_pos, sample_cos());
+	segment = draw_graph(tex_pos, sample_cos(), vec2(2.0));
 	color = mix(vec4(1.0, 0.0, 1.0, 1.0), color, segment);
 #endif
 

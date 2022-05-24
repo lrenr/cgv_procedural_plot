@@ -22,7 +22,7 @@ private:
     bool show_graph = false;
     float domain_alpha = 1.0f;
     float grid_strength = 60.0f;
-    float grid_scale = 1.0f;
+    float graph_scale = 1.0f;
     float segment_width = 0.02f;
 
     template<typename T>
@@ -41,7 +41,6 @@ public:
 	}
     void draw(cgv::render::context &ctx) override
     {
-        GLboolean line_smooth = glIsEnabled(GL_LINE_SMOOTH);
         GLboolean blend = glIsEnabled(GL_BLEND);
         GLboolean cull_face = glIsEnabled(GL_CULL_FACE);
         GLenum blend_src, blend_dst, depth;
@@ -49,8 +48,6 @@ public:
         glGetIntegerv(GL_BLEND_SRC, reinterpret_cast<GLint*>(&blend_src));
         glGetIntegerv(GL_DEPTH_FUNC, reinterpret_cast<GLint*>(&depth));
 
-        //glEnable(GL_LINE_SMOOTH);
-        glDisable(GL_LINE_SMOOTH);
         glDisable(GL_CULL_FACE);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -73,7 +70,7 @@ public:
         set_uniform(ctx, "alpha_test_val", domain_alpha);
         set_uniform(ctx, "domain_extent", RECT_EXTEND);
         set_uniform(ctx, "grid_strength", grid_strength);
-        set_uniform(ctx, "grid_scale", grid_scale);
+        set_uniform(ctx, "graph_scale", graph_scale);
         set_uniform(ctx, "segment_width", segment_width);
         auto &rcr = cgv::render::ref_rectangle_renderer(ctx, 0);
         rcr.set_prog(shader_program);
@@ -81,8 +78,6 @@ public:
         rcr.set_extent(ctx, RECT_EXTEND);
         rcr.render(ctx, 0, 1);
 
-        if (!line_smooth)
-            glDisable(GL_LINE_SMOOTH);
         if (!blend)
             glDisable(GL_BLEND);
         if (cull_face)
@@ -104,7 +99,7 @@ public:
         add_member_control(this, "show_graph", show_graph, "toggle", "w=60");
         add_member_control(this, "domain_alpha", domain_alpha, "value_slider", "min=0;max=1;step=0.001;ticks=true");
         add_member_control(this, "grid_strength", grid_strength, "value_slider", "min=10;max=200;step=1;ticks=true");
-        add_member_control(this, "grid_scale", grid_scale, "value_slider", "min=0.1;max=10;step=0.1;ticks=true");
+        add_member_control(this, "graph_scale", graph_scale, "value_slider", "min=0.1;max=10;step=0.1;ticks=true");
         add_member_control(this, "segment_width", segment_width, "value_slider", "min=0.001;max=0.1;step=0.001;ticks=true");
     }
 };

@@ -1,7 +1,8 @@
-#version 450
+#version 430
 
 #define SHOW_GRID 0
 #define SHOW_GRAPH 0
+#define GRAPH_COUNT 1
 
 /*
 The following interface is implemented in this shader:
@@ -36,6 +37,15 @@ uniform float graph_scale = 1.0;
 uniform float segment_width = 0.02;
 uniform vec2 domain_extent;
 
+struct Graph_Param
+{
+	int vertex_count;
+	float color[4];
+	float scale[2];
+};
+layout(std430, binding = 0) readonly buffer GP { Graph_Param graph_param[]; };
+layout(std430, binding = 1) readonly buffer GD { vec2 graph_data[]; };
+
 out vec4 frag_color;
 
 void gammaCorrection(vec4 color)
@@ -44,7 +54,7 @@ void gammaCorrection(vec4 color)
 }
 
 #if SHOW_GRAPH == 1
-vec2[100] sample_sin()
+/*vec2[100] sample_sin()
 {
 	vec2 s[100];
 	for(int i = 0; i<100; i++)
@@ -66,6 +76,22 @@ vec2[100] sample_cos()
 	}
 	return s;
 }
+float draw_graph(in vec2 p, in vec2[100] data, in vec2 scale)
+{
+	float sdf = 1.0;
+	for(int i = 0; i<99; i++)
+	{
+		if(p.x<(data[i]*scale).x-segment_width||p.x>(data[i+1]*scale).x+segment_width) continue;
+		sdf = min(sdf, sdf_segment(p, data[i]*scale, data[i+1]*scale));
+	}
+	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
+	return segment;
+}*/
+
+/**
+* signed distance function for a simple line segment between two points
+* here: https://iquilezles.org/articles/distfunctions2d/
+**/
 float sdf_segment(in vec2 p, in vec2 a, in vec2 b)
 {
 	vec2 pa = p-a;
@@ -73,15 +99,70 @@ float sdf_segment(in vec2 p, in vec2 a, in vec2 b)
 	float h = clamp(dot(pa,ba)/dot(ba,ba), 0.0, 1.0);
 	return length(pa-ba*h);
 }
-float draw_graph(in vec2 p, vec2[100] data, vec2 scale)
+
+/**
+* not really binary search and some segments are still checked multiple times
+* but it is alot better than a linear search...
+* (performance decrease invers proportional to segment_width because of overlap)
+**/
+bool binary_data_array_search(in vec2 p, in vec2 scale, in int offset, in int size, out float index)
 {
+	int head = size;
+	int off = offset;
+	float x, x_next, ddx;
 	float sdf = 1.0;
-	float delta = segment_width;
-	for(int i = 0; i<99; i++)
+
+	//x = (graph_data[off+head-head+0]*scale).x;
+	//x_next = (graph_data[off+head-head+1]*scale).x;
+	x = (graph_data[off+head/2]*scale).x;
+	x_next = (graph_data[off+head/2+1]*scale).x;
+	ddx = x_next-x;
+	int d = int(max(ceil(segment_width/ddx), 1))+1;
+	while(head>2)
 	{
-		if(p.x<(data[i]*scale).x-delta||p.x>(data[i+1]*scale).x+delta) continue;
-		sdf = min(sdf, sdf_segment(p, data[i]*scale, data[i+1]*scale));
+		head = head/2;
+		x = (graph_data[off+head]*scale).x;
+		x_next = (graph_data[off+head+1]*scale).x;
+
+		for(int i = 0; i<d; i++)
+		{
+			if(off+head-i<offset||off+head+i+1>offset+size-1) break;
+
+			vec2 u = graph_data[off+head+i]*scale;
+			vec2 v = graph_data[off+head+i+1]*scale;
+			vec2 x = graph_data[off+head-i]*scale;
+			vec2 y = graph_data[off+head-i+1]*scale;
+
+			u = graph_data[off+head+i]*scale;
+			v = graph_data[off+head+i+1]*scale;
+			if (!(p.x<u.x-segment_width||p.x>v.x+segment_width))
+			sdf = min(sdf, sdf_segment(p, u, v));
+			u = graph_data[off+head-i]*scale;
+			v = graph_data[off+head-i+1]*scale;
+			if (!(p.x<x.x-segment_width||p.x>y.x+segment_width))
+			sdf = min(sdf, sdf_segment(p, x, y));
+		}
+		if(p.x<x) continue;
+		off += head+1;
 	}
+
+	index = sdf;
+	return true;
+}
+
+float draw_graph_buffer(in vec2 p, in Graph_Param gp, in int offset)
+{
+	int size = gp.vertex_count;
+	vec2 scale = vec2(gp.scale[0], gp.scale[1]);
+	float sdf = 1.0;
+	/*for(int i = 0; i<size-1; i++)
+	{
+		if(p.x<(graph_data[offset+i]*scale).x-segment_width||p.x>(graph_data[offset+i+1]*scale).x+segment_width) continue;
+		sdf = min(sdf, sdf_segment(p, graph_data[offset+i]*scale, graph_data[offset+i+1]*scale));
+	}*/
+	float index = 0;
+	if(!binary_data_array_search(p, scale, offset, size, index)) return 1.0f;
+	sdf = index;
 	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
 	return segment;
 }
@@ -91,14 +172,13 @@ void finish_fragment(vec4 color)
 {
 	vec2 tex_pos = fi.splatcoord*domain_extent*graph_scale;// texture space extent transformation [-0.5*extent,+0.5*extend]
     color = vec4(vec3(0.3f), 1.0);
-	//const vec2 w = fwidthFine(tex_pos);
 
 	color = test_color(color);
 
 	float distance_to_camera = distance(vec3(0.0), fi.position_eye);
 
 #if SHOW_GRID == 1
-	vec2 tex_pos_grid = tex_pos+(0.5/grid_strength)*(graph_scale);
+	vec2 tex_pos_grid = tex_pos+(0.5/grid_strength)*graph_scale;
 	float N = grid_strength*(1.0/graph_scale);
 	vec2 w = fwidth(tex_pos_grid);
 	vec2 a = (tex_pos_grid+0.5*w);//*graph_scale;
@@ -109,14 +189,17 @@ void finish_fragment(vec4 color)
 #endif
 
 #if SHOW_GRAPH == 1
-	/*float sdf = sdf_segment(tex_pos, vec2(0.0), vec2(1.0));
-	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
-	//float segment = 1.0 - smoothstep(segment_width, segment_width-w.x, sdf);
-	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, segment);*/
-	float segment = draw_graph(tex_pos, sample_sin(), vec2(2.0));
-	color = mix(vec4(1.0, 1.0, 0.0, 1.0), color, segment);
-	segment = draw_graph(tex_pos, sample_cos(), vec2(2.0));
-	color = mix(vec4(1.0, 0.0, 1.0, 1.0), color, segment);
+	int soffset = 0;
+	for(int i = 0; i<GRAPH_COUNT; i++)
+	{
+		float[] c = graph_param[i].color;
+		vec4 graph_color = vec4(c[0], c[1], c[2], c[3]);
+		int offset = soffset;
+		float segment = draw_graph_buffer(tex_pos, graph_param[i], offset);
+		color = mix(graph_color, color, segment);
+		int size = graph_param[i].vertex_count;
+		soffset += size;
+	}
 #endif
 
 	//color.r = 1.0/distance_to_camera;

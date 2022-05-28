@@ -1,8 +1,7 @@
 build
 cmake-build
-CMAKE
-RUN
-bib/references.bib.*
 .idea
 doc
 tex/build
+bib/references.bib.*
+CMakeLists.txt.bak

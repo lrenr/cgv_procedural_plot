@@ -1,0 +1,161 @@
+From 05ab36b0dcfba4133147be3ebd737ff165ce16fb Mon Sep 17 00:00:00 2001
+From: dora-the-explorer <lui.renner@gmail.com>
+Date: Wed, 22 Jun 2022 10:33:16 +0200
+Subject: [PATCH] Patch for Mesa driver
+
+---
+ libs/cgv_gl/glsl/brdf.glsl       | 4 ++--
+ libs/cgv_gl/glsl/bump_map.glfs   | 2 +-
+ libs/cgv_gl/glsl/group.glsl      | 5 ++---
+ libs/cgv_gl/glsl/lights.glsl     | 2 +-
+ libs/cgv_gl/glsl/quaternion.glsl | 4 ++--
+ libs/cgv_gl/glsl/rectangle.glfs  | 2 +-
+ libs/cgv_gl/glsl/rectangle.glgs  | 2 +-
+ libs/cgv_gl/glsl/rectangle.glvs  | 4 ++--
+ libs/cgv_gl/glsl/side.glsl       | 2 +-
+ libs/cgv_gl/glsl/surface.glsl    | 2 +-
+ libs/cgv_gl/glsl/view.glsl       | 2 +-
+ 11 files changed, 15 insertions(+), 16 deletions(-)
+
+diff --git a/libs/cgv_gl/glsl/brdf.glsl b/libs/cgv_gl/glsl/brdf.glsl
+index a288091b..6aee5d3f 100644
+--- a/libs/cgv_gl/glsl/brdf.glsl
++++ b/libs/cgv_gl/glsl/brdf.glsl
+@@ -1,4 +1,4 @@
+-#version 150
++#version 420
+ 
+ const float PI = 3.14159265358979323846;
+ 
+@@ -158,4 +158,4 @@ vec3 evaluate_material(Material material, vec3 normal, vec3 omega_in, vec3 omega
+ 
+ 	res += spec;
+ 	return res;
+-}
+\ No newline at end of file
++}
+diff --git a/libs/cgv_gl/glsl/bump_map.glfs b/libs/cgv_gl/glsl/bump_map.glfs
+index 7516a62e..2348e390 100644
+--- a/libs/cgv_gl/glsl/bump_map.glfs
++++ b/libs/cgv_gl/glsl/bump_map.glfs
+@@ -1,4 +1,4 @@
+-#version 150
++#version 420
+ 
+ // not yet implemented: uniform int normal_index = -1;
+ uniform int bump_index = -1;
+diff --git a/libs/cgv_gl/glsl/group.glsl b/libs/cgv_gl/glsl/group.glsl
+index b98fb364..e7333bd7 100644
+--- a/libs/cgv_gl/glsl/group.glsl
++++ b/libs/cgv_gl/glsl/group.glsl
+@@ -1,5 +1,4 @@
+-#version 150
+-
++#version 420
+ /*
+ The following interface is implemented in this shader:
+ //***** begin interface of group.glsl ***********************************
+@@ -105,4 +104,4 @@ void right_multiply_group_position_matrix_and_rigid(inout mat4 PM, int group_ind
+ 		right_multiply_rigid_to_matrix(PM, group_rotations[group_index], group_translations[group_index]);
+ 	}
+ 	right_multiply_rigid_to_matrix(PM, rotation, translation);
+-}
+\ No newline at end of file
++}
+diff --git a/libs/cgv_gl/glsl/lights.glsl b/libs/cgv_gl/glsl/lights.glsl
+index 7ee53660..9dcd0234 100644
+--- a/libs/cgv_gl/glsl/lights.glsl
++++ b/libs/cgv_gl/glsl/lights.glsl
+@@ -1,4 +1,4 @@
+-#version 150 
++#version 420 
+ 
+ /*
+ The following interface is implemented in this shader:
+diff --git a/libs/cgv_gl/glsl/quaternion.glsl b/libs/cgv_gl/glsl/quaternion.glsl
+index b3fd679b..11316250 100644
+--- a/libs/cgv_gl/glsl/quaternion.glsl
++++ b/libs/cgv_gl/glsl/quaternion.glsl
+@@ -1,4 +1,4 @@
+-#version 150 compatibility
++#version 420 compatibility
+ 
+ /*
+ The following interface is implemented in this shader:
+@@ -49,4 +49,4 @@ void rigid_to_matrix(in vec4 q, in vec3 t, out mat4 M)
+ 	M[1] = vec4(y, 0.0);
+ 	M[2] = vec4(z, 0.0);
+ 	M[3] = vec4(t, 1.0);
+-}
+\ No newline at end of file
++}
+diff --git a/libs/cgv_gl/glsl/rectangle.glfs b/libs/cgv_gl/glsl/rectangle.glfs
+index a31cf483..9288021b 100644
+--- a/libs/cgv_gl/glsl/rectangle.glfs
++++ b/libs/cgv_gl/glsl/rectangle.glfs
+@@ -1,4 +1,4 @@
+-#version 330 core
++#version 420 core
+ 
+ uniform bool use_texture = false;
+ // 0 ... replace (color.rgba = texture.rgba)
+diff --git a/libs/cgv_gl/glsl/rectangle.glgs b/libs/cgv_gl/glsl/rectangle.glgs
+index 79d07956..35626a06 100644
+--- a/libs/cgv_gl/glsl/rectangle.glgs
++++ b/libs/cgv_gl/glsl/rectangle.glgs
+@@ -1,4 +1,4 @@
+-#version 330 core
++#version 420 core
+ 
+ #define PLOT_MODE 0
+ 
+diff --git a/libs/cgv_gl/glsl/rectangle.glvs b/libs/cgv_gl/glsl/rectangle.glvs
+index 9acabc11..1664de89 100644
+--- a/libs/cgv_gl/glsl/rectangle.glvs
++++ b/libs/cgv_gl/glsl/rectangle.glvs
+@@ -1,4 +1,4 @@
+-#version 330 core
++#version 420 core
+ 
+ uniform bool  has_rotations;
+ uniform bool  has_translations;
+@@ -100,4 +100,4 @@ void main()
+ 		t += translation;
+ 	right_multiply_group_position_matrix_and_rigid(vo.modelview, group_index, q, t);
+ 	gl_Position = vec4(vec3(0.0),1.0);
+-}
+\ No newline at end of file
++}
+diff --git a/libs/cgv_gl/glsl/side.glsl b/libs/cgv_gl/glsl/side.glsl
+index c3e17eaf..21bfe946 100644
+--- a/libs/cgv_gl/glsl/side.glsl
++++ b/libs/cgv_gl/glsl/side.glsl
+@@ -1,4 +1,4 @@
+-#version 150 
++#version 420 
+ 
+ // use cgv/render/context/CullingMode enum (0 .. off, 1 .. backface, 2 .. frontface)
+ uniform int culling_mode = 0;
+diff --git a/libs/cgv_gl/glsl/surface.glsl b/libs/cgv_gl/glsl/surface.glsl
+index acaa855d..e10fa551 100644
+--- a/libs/cgv_gl/glsl/surface.glsl
++++ b/libs/cgv_gl/glsl/surface.glsl
+@@ -1,4 +1,4 @@
+-#version 150
++#version 420
+ 
+ // use cgv/render/context/IlluminationMode enum (0 .. off, 1 .. one sided, 2 .. two sided)
+ uniform int illumination_mode = 2;
+diff --git a/libs/cgv_gl/glsl/view.glsl b/libs/cgv_gl/glsl/view.glsl
+index 0bf4f56b..fccc7600 100644
+--- a/libs/cgv_gl/glsl/view.glsl
++++ b/libs/cgv_gl/glsl/view.glsl
+@@ -1,4 +1,4 @@
+-#version 150
++#version 420
+ 
+ /*
+ The following interface is implemented in this shader:
+-- 
+2.36.1
+

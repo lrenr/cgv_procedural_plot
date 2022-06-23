@@ -45,7 +45,7 @@ private:
     template<typename T>
     void load_data_buffer(cgv::render::context &ctx, cgv::render::vertex_buffer &buffer, T &data)
     {
-        cgv::render::vertex_buffer sbo(cgv::render::VBT_VERTICES, cgv::render::VBU_STATIC_READ);
+        cgv::render::vertex_buffer sbo(cgv::render::VBT_STORAGE, cgv::render::VBU_STATIC_READ);
         if (!sbo.create(ctx, data)) throw;
         buffer = std::move(sbo);
     }
@@ -76,12 +76,12 @@ private:
         graph_data.insert(graph_data.end(), s3.begin(), s3.end());
         Graph_Param gp;
         gp.vertex_count = 10000;
-        gp.color = {1.0f, 1.0f, 0.0f, 1.0f};
-        gp.scale = {3.0f, 1.0f};
+        gp.color = vec4(1.0f, 1.0f, 0.0f, 1.0f);
+        gp.scale = vec2(3.0f, 1.0f);
         graph_param.push_back(gp);
-        gp.color = {1.0f, 0.0f, 1.0f, 1.0f};
+        gp.color = vec4(1.0f, 0.0f, 1.0f, 1.0f);
         graph_param.push_back(gp);
-        gp.color = {0.0f, 1.0f, 1.0f, 1.0f};
+        gp.color = vec4(0.0f, 1.0f, 1.0f, 1.0f);
         graph_param.push_back(gp);
         //graph_count = 3;
     }
@@ -176,4 +176,4 @@ public:
 };
 
 #include <cgv/base/register.h>
-cgv::base::factory_registration<procedural_plot> procedural_plot("new/demo/procedural_plot", 'N');
+cgv::base::factory_registration<procedural_plot> procedural_plot("New/Demo/procedural_plot", 'N');

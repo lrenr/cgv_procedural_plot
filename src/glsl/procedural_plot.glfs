@@ -8,7 +8,7 @@
 The following interface is implemented in this shader:
 //***** begin interface of procedural_plot.glfs ***********************************
 uniform float gamma = 2.2;
-void finish_fragment(vec4 color);
+void finish_fragment(vec4 color, float depth);
 //***** end interface of procedural_plot.glfs ***********************************
 */
 
@@ -21,6 +21,7 @@ in RECTANGLE_FS {
 	vec3 normal_eye;
 	vec2 texcoord;
 	vec4 color;
+	vec4 secondary_color;
 	vec4 border_color;
 	float depth_offset;
 	flat int side; // 0 is back facing and 1 is front facing
@@ -43,6 +44,7 @@ struct Graph_Param
 	float color[4];
 	float scale[2];
 };
+
 layout(std430, binding = 0) readonly buffer GP { Graph_Param graph_param[]; };
 layout(std430, binding = 1) readonly buffer GD { vec2 graph_data[]; };
 
@@ -168,7 +170,7 @@ float draw_graph_buffer(in vec2 p, in Graph_Param gp, in int offset)
 }
 #endif
 
-void finish_fragment(vec4 color)
+void finish_fragment(vec4 color, float depth)
 {
 	vec2 tex_pos = fi.splatcoord*domain_extent*graph_scale;// texture space extent transformation [-0.5*extent,+0.5*extend]
     color = vec4(vec3(0.3f), 1.0);
@@ -178,14 +180,28 @@ void finish_fragment(vec4 color)
 	float distance_to_camera = distance(vec3(0.0), fi.position_eye);
 
 #if SHOW_GRID == 1
-	vec2 tex_pos_grid = tex_pos+(0.5/grid_strength)*graph_scale;
+	float offset = (0.5/(grid_strength))*(graph_scale);
+	vec2 tex_pos_grid = tex_pos+offset;
+	const float CN = grid_strength*(1.0/graph_scale);
 	float N = grid_strength*(1.0/graph_scale);
-	vec2 w = fwidth(tex_pos_grid);
-	vec2 a = (tex_pos_grid+0.5*w);//*graph_scale;
-	vec2 b = (tex_pos_grid-0.5*w);//*graph_scale;
-	vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w);//*(1.0/graph_scale);
-	float grid = (1.0-i.x)*(1.0-i.y);
-	color = mix(vec4(1.0), color, grid);
+	vec2 i;
+	for(float j = 1; j<1000; j*=2)
+	{
+		//N = CN*(1.0/j);
+		//N = j*(CN);
+		N = (N*(1+distance_to_camera))+(j);
+		offset = 0.5/N*(1.0/j);
+		//tex_pos_grid = (tex_pos*j)+(offset);
+		tex_pos_grid = (tex_pos)+(offset);
+		vec2 w = fwidth(tex_pos_grid);
+		vec2 a = (tex_pos_grid+0.5*w)*(j);//*graph_scale;
+		vec2 b = (tex_pos_grid-0.5*w)*(j);//*graph_scale;
+		vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w)*(1.0/j);//*(1.0/graph_scale);
+		float grid = (1.0-i.x)*(1.0-i.y);
+		color = mix(vec4(1.0), color, grid);
+	}
+	//float grid = (1.0-i.x)*(1.0-i.y);
+	//color = mix(vec4(1.0), color, grid);
 #endif
 
 #if SHOW_GRAPH == 1

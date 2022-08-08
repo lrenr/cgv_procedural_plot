@@ -1,0 +1,119 @@
+#version 420
+
+#define SHOW_GRAPH 0
+#define SEGMENT_TYPE 0
+
+/*
+The following interface is implemented in this shader:
+//***** begin interface of sdf.glfs ***********************************
+float sdf_axis(in vec2 p);
+float sdf_segment( in vec2 p, in vec2 a, in vec2 b, float wi);
+float sdf_parallelogram_segment(in vec2 p, in vec2 a, in vec2 b, float v);
+//***** end interface of sdf.glfs ***********************************
+*/
+
+float sdf_axis(in vec2 p)
+{
+    return min(abs(p.x), abs(p.y));
+}
+
+float sdf_circle(vec2 p, float r)
+{
+    return length(p) - r;
+}
+
+float sdf_box(in vec2 p, in vec2 a, in vec2 b, float th, float r)
+{
+    float l = length(b-a);
+    vec2  d = (b-a)/l;
+    vec2  q = (p-(a+b)*0.5);
+    q = mat2(d.x,-d.y,d.y,d.x)*q;
+    q = abs(q)-vec2(l,th)*0.5;
+    return length(max(q,0.0)) + min(max(q.x,q.y),0.0) - r;
+}
+
+#if SHOW_GRAPH == 1
+
+#if SEGMENT_TYPE == 0
+/**
+* signed distance function for a simple line segment between two points
+* here: https://iquilezles.org/articles/distfunctions2d/
+**/
+float sdf_segment(in vec2 p, in vec2 a, in vec2 b, float wi)
+{
+    vec2 pa = p-a;
+    vec2 ba = b-a;
+    float h = clamp(dot(pa,ba)/dot(ba,ba), 0.0, 1.0);
+    return length(pa-ba*h);
+}
+#endif
+
+#if SEGMENT_TYPE == 1
+float sdf_segment( in vec2 p, in vec2 a, in vec2 b, float wi)
+{
+    float deg = radians(90);
+    mat2 mat;
+    mat[0] = vec2(cos(deg), sin(deg));
+    mat[1] = vec2(-sin(deg), cos(deg));
+    vec2 ab = b-a;
+    vec2 m = a+(ab*0.5);
+    p = p-m;
+    p = p*mat;
+    float he = b.x-a.x;
+    float sk = a.y-b.y;
+
+    vec2 e = vec2(sk,he);
+    p = (p.y<0.0)?-p:p;
+    vec2  w = p - e; w.x -= clamp(w.x,-wi,wi);
+    vec2  d = vec2(dot(w,w), -w.y);
+    float s = p.x*e.y - p.y*e.x;
+    p = (s<0.0)?-p:p;
+    vec2  v = p - vec2(wi,0); v -= e*clamp(dot(v,e)/dot(e,e),-1.0,1.0);
+    d = min( d, vec2(dot(v,v), wi*he-abs(s)));
+    return sqrt(d.x)*sign(-d.y);
+}
+#endif
+
+#endif
+
+float sdf_parallelogram_segment(in vec2 p, in vec2 a, in vec2 b, float v)
+{
+    vec2 ab = b-a;
+    vec2 n = normalize(vec2(-ab.y, ab.x));
+    vec2 u = v*n;
+    float h = -(u.x/ab.x);
+    float w = u.y+(h*ab.y);
+    vec2 m = a+(ab*0.5);
+    p = p-m;
+    a = a-m;
+    b = b-m;
+    if(p.x<0) p *= -1.0;
+    float dx = p.x - b.x;
+    float dy = p.y - b.y;
+    float d[4];
+    if(p.x>=b.x && p.y<b.y+w && p.y>b.y-w) return dx;
+    else
+    {
+        float t = dot(p, n);
+        float r = min(max(dx, dy), 0.0);
+        d[0] = length(vec2(dx, dy+w));
+        d[1] = length(vec2(dx, dy-w));
+        d[2] = (t-w);
+        d[3] = -(t+w);
+        d[2] = max(d[2], d[3]);
+        float dmin = d[0];
+        if(p.x>=b.x)
+        {
+            /*for(int i = 0; i < 2; i++)
+            {
+                if(abs(d[i])<dmin) dmin = d[i];
+            }*/
+            dmin = max(d[0], d[1]);
+        }
+        else
+        {
+            dmin = min(d[2], max(d[0], d[1]));
+        }
+        return dmin;
+    }
+}

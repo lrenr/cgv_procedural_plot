@@ -1,8 +1,13 @@
 #version 430
 
+#define IS_HIDDEN 0
+#define USE_DYNAMIC_GRID 0
 #define SHOW_GRID 0
+#define SHOW_MARKS 0
+#define SHOW_AXIS 0
 #define SHOW_GRAPH 0
 #define GRAPH_COUNT 1
+#define SEGMENT_TYPE 0
 
 /*
 The following interface is implemented in this shader:
@@ -12,9 +17,13 @@ void finish_fragment(vec4 color, float depth);
 //***** end interface of procedural_plot.glfs ***********************************
 */
 
-//***** begin interface of hallo_world.glfs ***********************************
-vec4 test_color(vec4 color);
-//***** end interface of hallo_world.glfs ***********************************
+//***** begin interface of sdf.glfs ***********************************
+float sdf_axis(in vec2 p);
+float sdf_segment( in vec2 p, in vec2 a, in vec2 b, float wi);
+float sdf_parallelogram_segment(in vec2 p, in vec2 a, in vec2 b, float v);
+float sdf_circle(vec2 p, float r);
+float sdf_box(in vec2 p, in vec2 a, in vec2 b, float th, float r);
+//***** end interface of sdf.glfs ***********************************
 
 in RECTANGLE_FS {
 	vec3 position_eye;
@@ -32,11 +41,13 @@ in RECTANGLE_FS {
 	vec2 percentual_core_size;
 } fi;
 
+uniform float alpha_test_val = 1.0f;
 uniform float gamma = 2.2;
 uniform float grid_strength = 60.0;
 uniform float graph_scale = 1.0;
 uniform float segment_width = 0.02;
 uniform vec2 domain_extent;
+uniform vec2 offset;
 
 struct Graph_Param
 {
@@ -56,6 +67,9 @@ void gammaCorrection(vec4 color)
 }
 
 #if SHOW_GRAPH == 1
+/*
+* graphs without binary search
+*/
 /*vec2[100] sample_sin()
 {
 	vec2 s[100];
@@ -90,18 +104,14 @@ float draw_graph(in vec2 p, in vec2[100] data, in vec2 scale)
 	return segment;
 }*/
 
-/**
-* signed distance function for a simple line segment between two points
-* here: https://iquilezles.org/articles/distfunctions2d/
-**/
-float sdf_segment(in vec2 p, in vec2 a, in vec2 b)
+vec2 get_graph_data(in int off)
 {
-	vec2 pa = p-a;
-	vec2 ba = b-a;
-	float h = clamp(dot(pa,ba)/dot(ba,ba), 0.0, 1.0);
-	return length(pa-ba*h);
+	vec2 p = graph_data[off];
+	//p.x = log(p.x);
+	return p;
 }
 
+#if SEGMENT_TYPE == 0
 /**
 * not really binary search and some segments are still checked multiple times
 * but it is alot better than a linear search...
@@ -114,13 +124,56 @@ bool binary_data_array_search(in vec2 p, in vec2 scale, in int offset, in int si
 	float x, x_next, ddx;
 	float sdf = 1.0;
 
-	//x = (graph_data[off+head-head+0]*scale).x;
-	//x_next = (graph_data[off+head-head+1]*scale).x;
-	x = (graph_data[off+head/2]*scale).x;
-	x_next = (graph_data[off+head/2+1]*scale).x;
+	x = (get_graph_data(off+head/2)*scale).x;
+	x_next = (get_graph_data(off+head/2+1)*scale).x;
 	ddx = x_next-x;
 	int d = int(max(ceil(segment_width/ddx), 1))+1;
 	while(head>2)
+	{
+		head = head/2;
+		x = (get_graph_data(off+head)*scale).x;
+		x_next = (get_graph_data(off+head+1)*scale).x;
+
+		for(int i = 0; i<d; i++)
+		{
+			if(off+head-i<offset||off+head+i+1>offset+size-1) break;
+
+			vec2 u = get_graph_data(off+head+i)*scale;
+			vec2 v = get_graph_data(off+head+i+1)*scale;
+			vec2 x = get_graph_data(off+head-i)*scale;
+			vec2 y = get_graph_data(off+head-i+1)*scale;
+
+			u = get_graph_data(off+head+i)*scale;
+			v = get_graph_data(off+head+i+1)*scale;
+			if (!(p.x<u.x-segment_width||p.x>v.x+segment_width))
+			sdf = min(sdf, sdf_segment(p, u, v, 0));
+			u = get_graph_data(off+head-i)*scale;
+			v = get_graph_data(off+head-i+1)*scale;
+			if (!(p.x<x.x-segment_width||p.x>y.x+segment_width))
+			sdf = min(sdf, sdf_segment(p, x, y, 0));
+		}
+		if(p.x<x) continue;
+		off += head+1;
+	}
+
+	index = sdf;
+	return true;
+}
+#endif
+
+#if SEGMENT_TYPE == 1
+bool binary_data_array_search(in vec2 p, in vec2 scale, in int offset, in int size, out float sdf_out)
+{
+	int head = size;
+	int off = offset;
+	float x, x_next, ddx;
+	float sdf = 1.0;
+
+	x = (graph_data[off+head-head+0]*scale).x;
+	x_next = (graph_data[off+head-head+1]*scale).x;
+	ddx = x_next-x;
+	int d = 1;
+	while(head>0)
 	{
 		head = head/2;
 		x = (graph_data[off+head]*scale).x;
@@ -138,87 +191,151 @@ bool binary_data_array_search(in vec2 p, in vec2 scale, in int offset, in int si
 			u = graph_data[off+head+i]*scale;
 			v = graph_data[off+head+i+1]*scale;
 			if (!(p.x<u.x-segment_width||p.x>v.x+segment_width))
-			sdf = min(sdf, sdf_segment(p, u, v));
+			sdf = min(sdf, sdf_parallelogram_segment(p, u, v, segment_width));
 			u = graph_data[off+head-i]*scale;
 			v = graph_data[off+head-i+1]*scale;
 			if (!(p.x<x.x-segment_width||p.x>y.x+segment_width))
-			sdf = min(sdf, sdf_segment(p, x, y));
+			sdf = min(sdf, sdf_parallelogram_segment(p, x, y, segment_width));
 		}
 		if(p.x<x) continue;
 		off += head+1;
 	}
 
-	index = sdf;
+	sdf_out = sdf;
 	return true;
 }
-
-float draw_graph_buffer(in vec2 p, in Graph_Param gp, in int offset)
-{
-	int size = gp.vertex_count;
-	vec2 scale = vec2(gp.scale[0], gp.scale[1]);
-	float sdf = 1.0;
-	/*for(int i = 0; i<size-1; i++)
-	{
-		if(p.x<(graph_data[offset+i]*scale).x-segment_width||p.x>(graph_data[offset+i+1]*scale).x+segment_width) continue;
-		sdf = min(sdf, sdf_segment(p, graph_data[offset+i]*scale, graph_data[offset+i+1]*scale));
-	}*/
-	float index = 0;
-	if(!binary_data_array_search(p, scale, offset, size, index)) return 1.0f;
-	sdf = index;
-	float segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
-	return segment;
-}
 #endif
 
-void finish_fragment(vec4 color, float depth)
+vec4 draw_graph(in vec4 color, in vec2 tex_pos)
 {
-	vec2 tex_pos = fi.splatcoord*domain_extent*graph_scale;// texture space extent transformation [-0.5*extent,+0.5*extend]
-    color = vec4(vec3(0.3f), 1.0);
-
-	color = test_color(color);
-
-	float distance_to_camera = distance(vec3(0.0), fi.position_eye);
-
-#if SHOW_GRID == 1
-	float offset = (0.5/(grid_strength))*(graph_scale);
-	vec2 tex_pos_grid = tex_pos+offset;
-	const float CN = grid_strength*(1.0/graph_scale);
-	float N = grid_strength*(1.0/graph_scale);
-	vec2 i;
-	for(float j = 1; j<1000; j*=2)
-	{
-		//N = CN*(1.0/j);
-		//N = j*(CN);
-		N = (N*(1+distance_to_camera))+(j);
-		offset = 0.5/N*(1.0/j);
-		//tex_pos_grid = (tex_pos*j)+(offset);
-		tex_pos_grid = (tex_pos)+(offset);
-		vec2 w = fwidth(tex_pos_grid);
-		vec2 a = (tex_pos_grid+0.5*w)*(j);//*graph_scale;
-		vec2 b = (tex_pos_grid-0.5*w)*(j);//*graph_scale;
-		vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w)*(1.0/j);//*(1.0/graph_scale);
-		float grid = (1.0-i.x)*(1.0-i.y);
-		color = mix(vec4(1.0), color, grid);
-	}
-	//float grid = (1.0-i.x)*(1.0-i.y);
-	//color = mix(vec4(1.0), color, grid);
-#endif
-
-#if SHOW_GRAPH == 1
+	//tex_pos.x = pow(tex_pos.x/4, 10);
 	int soffset = 0;
 	for(int i = 0; i<GRAPH_COUNT; i++)
 	{
 		float[] c = graph_param[i].color;
 		vec4 graph_color = vec4(c[0], c[1], c[2], c[3]);
 		int offset = soffset;
-		float segment = draw_graph_buffer(tex_pos, graph_param[i], offset);
+		float segment = 0;
+		Graph_Param gp = graph_param[i];
+		int size = gp.vertex_count;
+		vec2 scale = vec2(gp.scale[0], gp.scale[1]);
+		float sdf = 1.0;
+		if(!binary_data_array_search(tex_pos, scale, offset, size, sdf)) segment =  1.0f;
+		#if SEGMENT_TYPE == 0
+		segment = 1.0 - smoothstep(segment_width, segment_width-fwidth(sdf), sdf);
+		#endif
+		#if SEGMENT_TYPE == 1
+		segment = 1.0 - smoothstep(0, -fwidth(sdf), sdf);
+		#endif
 		color = mix(graph_color, color, segment);
-		int size = graph_param[i].vertex_count;
 		soffset += size;
 	}
+	return color;
+}
 #endif
 
-	//color.r = 1.0/distance_to_camera;
+#if SHOW_GRID == 1
+vec4 draw_grid(in vec4 color, in vec2 tex_pos, in float distance_to_camera, in vec4 dye_color)
+{
+	float grid_offset = (0.5/(grid_strength))*(graph_scale);
+	vec2 tex_pos_grid = tex_pos+grid_offset;
+	const float CN = grid_strength*(1.0/graph_scale);
+	float N = grid_strength*(1.0/graph_scale);
+	vec2 i;
+	float count = 2;
+	#if USE_DYNAMIC_GRID == 1
+	count = 512;
+	#endif
+	for(float j = 1; j<count; j*=2)
+	{
+		//N = CN*(1.0/j);
+		//N = j*(CN);
+		N = (N*(1+distance_to_camera)*1.5)+(j);
+		grid_offset = 0.5/N*(1.0/j);
+		tex_pos_grid = (tex_pos)+(grid_offset);
+		vec2 w = fwidth(tex_pos_grid);
+		vec2 a = (tex_pos_grid+0.5*w)*(j);//*graph_scale;
+		vec2 b = (tex_pos_grid-0.5*w)*(j);//*graph_scale;
+		vec2 i = (floor(a)+min(fract(a)*N, 1.0)-floor(b)-min(fract(b)*N, 1.0))/(N*w)*(1.0/j);//*(1.0/graph_scale);
+		float grid = (1.0-i.x)*(1.0-i.y);
+		color = mix(dye_color, color, grid);
+	}
+	//float grid = (1.0-i.x)*(1.0-i.y);
+	//color = mix(vec4(1.0), color, grid);
+	return color;
+}
+#endif
+
+#if SHOW_MARKS == 1
+vec4 draw_marks(in vec4 color, in vec2 tex_pos, in vec4 dye_color)
+{
+	float height = 0.05;
+	float width = 0.005;
+	float mark_sdf = 0.0;
+	float step = 1.0;
+	vec2 n = floor(domain_extent*graph_scale/step);
+	vec2 mark_offset = offset*domain_extent*graph_scale;
+	for(int j = -int(n.x+mark_offset.x)-1; j < n.x-mark_offset.x+1; j++)
+	{
+		if(j==0) continue;
+		mark_sdf = sdf_box(tex_pos, vec2(step*j, height), vec2(step*j, -height), width, 0.01);
+		float mark = 1.0 - smoothstep(0, -fwidth(mark_sdf), mark_sdf);
+		color = mix(dye_color, color, mark);
+	}
+	for(int j = -int(n.y+mark_offset.y)-1; j < n.y-mark_offset.y+1; j++)
+	{
+		if(j==0) continue;
+		mark_sdf = sdf_box(tex_pos, vec2(height, step*j), vec2(-height, step*j), width, 0.01);
+		float mark = 1.0 - smoothstep(0, -fwidth(mark_sdf), mark_sdf);
+		color = mix(dye_color, color, mark);
+	}
+	return color;
+}
+#endif
+
+#if SHOW_AXIS == 1
+vec4 draw_axis(in vec4 color, in vec2 tex_pos, in vec4 dye_color)
+{
+	float axis = sdf_axis(tex_pos);
+	float segment = 1.0 - smoothstep(0.01, 0.01-fwidth(axis), axis);
+	color = mix(dye_color, color, segment);
+	return color;
+}
+#endif
+
+void finish_fragment(vec4 color, float depth)
+{
+	vec2 tex_pos = fi.splatcoord*domain_extent;
+	tex_pos -= offset;
+	tex_pos *= graph_scale;
+	color = vec4(vec3(0.3), 1.0);
+
+	int min_x = int(-(domain_extent.x*graph_scale)-offset.x);
+	int max_x = int((domain_extent.x*graph_scale)-offset.x);
+
+	color.a = alpha_test_val;
+#if IS_HIDDEN == 1
+	color.a = 0.0f;
+#endif
+
+	float distance_to_camera = distance(vec3(0.0), fi.position_eye);
+
+#if SHOW_GRID == 1
+	color = draw_grid(color, tex_pos, distance_to_camera, vec4(1.0));
+#endif
+
+#if SHOW_MARKS == 1
+	color = draw_marks(color, tex_pos, vec4(0.7, 1.2, 0.7, 1.0));
+#endif
+
+#if SHOW_AXIS == 1
+	color = draw_axis(color, tex_pos, vec4(0.7, 1.2, 0.7, 1.0));
+#endif
+
+#if SHOW_GRAPH == 1
+	color = draw_graph(color, tex_pos);
+#endif
+
 	frag_color = color;
 	gammaCorrection(color);
 }
